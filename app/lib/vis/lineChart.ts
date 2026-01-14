@@ -75,5 +75,5 @@ export const lineChart = <T extends d3.BaseType>(
       .attr("height", a)
       .attr("width", a)
       .attr("fill", "var(--color-indigo-400)");
-  })
-}
+  });
+};
