@@ -80,7 +80,7 @@ export default function Index() {
   }, [size]);
 
   return (
-    <div className="p-16 min-h-screen flex flex-col gap-2">
+    <div className="p-16 h-screen flex flex-col gap-2">
       <p className="min-w-56 p-4 bg-zinc-900 rounded-xl border border-zinc-800">d3 test, size: [{size.width}, {size.height}]</p>
       <div
         ref={visRef}
