@@ -81,7 +81,6 @@ export default function Index() {
 
     const data: Point2D[] = [];
     for (let i = 0; i < 15; i++) {
-      // data.push({ x: Math.random() * 10, y: Math.random() * 15 });
       data.push({ x: i, y: 1/8 * i * i });
     }
     lineChart(root, { start: 0, end: 10 }, { start: 0, end: 15 }, 32, size, data);
