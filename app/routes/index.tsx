@@ -1,5 +1,7 @@
 import type { Route } from "./+types/index";
 import {useEffect, useRef} from "react";
+import { loadEmissions, byIso3, latestYear, sourceSharesForYear } from "~/lib/emissions";
+import { loadWorldBank } from "~/lib/worldBank";
 import {useVisualizationSize} from "~/lib/useVisualizationSize";
 import * as d3 from 'd3';
 
@@ -18,8 +20,43 @@ export default function Index() {
   const visRef = useRef<HTMLDivElement>(null);
   const { size } = useVisualizationSize(visRef);
 
+  // console test emissionloader
+  useEffect(() => {
+    loadEmissions().then((data) => {
+      console.log("Countries loaded:", data.length);
+
+      const example = byIso3(data, "DEU") ?? data[0];
+      console.log("Example country:", example.country, example.iso3);
+
+      const years = example.points.map((p) => p.year);
+      console.log("Year range:", Math.min(...years), "-", Math.max(...years));
+
+      const yr = latestYear(example.points);
+      console.log("Latest year:", yr);
+
+      if (yr) {
+        const shares = sourceSharesForYear(example.points, yr);
+        console.log("Shares latest year:", shares);
+
+        const sum = shares.reduce((s, d) => s + d.share, 0);
+        console.log("Sum of shares (≈1):", sum);
+      }
+    });
+  }, []);
+
+  // console test worldbankloader
+  useEffect(() => {
+    loadWorldBank().then((wb) => {
+      console.log("WB series:", wb.length);
+      const ex = wb.find((d) => d.country === "Germany") ?? wb[0];
+      console.log("WB example:", ex?.country);
+      console.log("WB points sample:", ex?.points.slice(0, 5));
+    });
+}, []);
+
   // d3 test
   useEffect(() => {
+
     d3.select(visRef.current).selectAll("*").remove();
 
     const root = d3
