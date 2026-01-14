@@ -1,12 +1,12 @@
 import * as d3 from 'd3';
 import type { Size2D } from "~/lib/useVisualizationSize";
 
-type Range = {
+export type Range = {
   start: number;
   end: number;
 };
 
-type Point2D = {
+export type Point2D = {
   x: number;
   y: number;
 };
@@ -37,12 +37,28 @@ export const lineChart = <T extends d3.BaseType>(
     .domain([y.end, y.start])
     .range([margin, size.height - margin]);
   const axisY = d3
-    .axisLeft(scaleY);
+    .axisLeft(scaleY)
+    .ticks(y.end - y.start);
 
   selection
     .append('g')
     .attr("transform", `translate(${margin}, 0)`)
     .call(axisY);
 
-  dataPoints.forEach((point) => console.log(`${point.x},${point.y}`));
+  const dataSortedX = dataPoints
+    .sort((a, b) => a.x - b.x);
+
+  const dx = (size.width - 2 * margin) / (x.end - x.start);
+  const dy = (size.height - 2 * margin) / (y.end - y.start);
+
+  const a = 8;
+  dataSortedX.forEach((point) => {
+    selection
+      .append("rect")
+      .attr("x", margin + (point.x * dx) - (a / 2))
+      .attr("y", size.height - margin -(point.y * dy) - (a / 2))
+      .attr("height", a)
+      .attr("width", a)
+      .attr("fill", "var(--color-indigo-400)");
+  });
 }

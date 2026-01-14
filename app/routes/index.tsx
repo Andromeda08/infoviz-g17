@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { loadEmissions, byIso3, latestYear, sourceSharesForYear } from "~/lib/emissions";
 import { loadWorldBank } from "~/lib/worldBank";
 import { useVisualizationSize } from "~/lib/useVisualizationSize";
-import { lineChart } from "~/lib/vis/lineChart";
+import {lineChart, type Point2D} from "~/lib/vis/lineChart";
 
 // Vite "work-around" for react fast refresh to re-render d3 useEffect on source changes.
 if (import.meta.hot) {
@@ -79,7 +79,12 @@ export default function Index() {
     //       .attr("fill", color);
     //   });
 
-    lineChart(root, { start: 0, end: 10 }, { start: 0, end: 15 }, 32, size);
+    const data: Point2D[] = [];
+    for (let i = 0; i < 15; i++) {
+      // data.push({ x: Math.random() * 10, y: Math.random() * 15 });
+      data.push({ x: i, y: 1/8 * i * i });
+    }
+    lineChart(root, { start: 0, end: 10 }, { start: 0, end: 15 }, 32, size, data);
   }, [size]);
 
   return (
