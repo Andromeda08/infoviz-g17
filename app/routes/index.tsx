@@ -1,9 +1,10 @@
 import type { Route } from "./+types/index";
-import {useEffect, useRef} from "react";
+import { useEffect, useRef } from "react";
+import * as d3 from 'd3';
 import { loadEmissions, byIso3, latestYear, sourceSharesForYear } from "~/lib/emissions";
 import { loadWorldBank } from "~/lib/worldBank";
-import {useVisualizationSize} from "~/lib/useVisualizationSize";
-import * as d3 from 'd3';
+import { useVisualizationSize } from "~/lib/useVisualizationSize";
+import { lineChart } from "~/lib/vis/lineChart";
 
 // Vite "work-around" for react fast refresh to re-render d3 useEffect on source changes.
 if (import.meta.hot) {
@@ -65,18 +66,20 @@ export default function Index() {
       .attr('width', size.width)
       .attr('height', size.height);
 
-    const a = 32;
-    const gap = 8;
-    [ "var(--color-emerald-400)", "var(--color-teal-400)", "var(--color-cyan-400)", "var(--color-sky-400)", "var(--color-blue-400)", "var(--color-indigo-400)", "var(--color-violet-400)"]
-      .forEach((color, i) => {
-        root
-          .append("rect")
-          .attr("x", 16 + i * (a + gap))
-          .attr("y", 16)
-          .attr("height", a)
-          .attr("width", a)
-          .attr("fill", color);
-      })
+    // const a = 32;
+    // const gap = 8;
+    // [ "var(--color-emerald-400)", "var(--color-teal-400)", "var(--color-cyan-400)", "var(--color-sky-400)", "var(--color-blue-400)", "var(--color-indigo-400)", "var(--color-violet-400)"]
+    //   .forEach((color, i) => {
+    //     root
+    //       .append("rect")
+    //       .attr("x", 16 + i * (a + gap))
+    //       .attr("y", 16)
+    //       .attr("height", a)
+    //       .attr("width", a)
+    //       .attr("fill", color);
+    //   });
+
+    lineChart(root, { start: 0, end: 10 }, { start: 0, end: 15 }, 32, size);
   }, [size]);
 
   return (
