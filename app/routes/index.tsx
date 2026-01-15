@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { loadEmissions, byIso3, latestYear, sourceSharesForYear } from "~/lib/emissions";
 import { loadWorldBank } from "~/lib/worldBank";
 import { useVisualizationSize } from "~/lib/useVisualizationSize";
-import {lineChart, type Point2D} from "~/lib/vis/lineChart";
+import {type Line, lineChart, type Point2D} from "~/lib/vis/lineChart";
 
 // Vite "work-around" for react fast refresh to re-render d3 useEffect on source changes.
 if (import.meta.hot) {
@@ -66,24 +66,66 @@ export default function Index() {
       .attr('width', size.width)
       .attr('height', size.height);
 
-    // const a = 32;
-    // const gap = 8;
-    // [ "var(--color-emerald-400)", "var(--color-teal-400)", "var(--color-cyan-400)", "var(--color-sky-400)", "var(--color-blue-400)", "var(--color-indigo-400)", "var(--color-violet-400)"]
-    //   .forEach((color, i) => {
-    //     root
-    //       .append("rect")
-    //       .attr("x", 16 + i * (a + gap))
-    //       .attr("y", 16)
-    //       .attr("height", a)
-    //       .attr("width", a)
-    //       .attr("fill", color);
-    //   });
+    const drawExampleLineChart = () => {
+      const points1: Point2D[] = [];
+      for (let i = -10; i < 11; i++) {
+        points1.push({ x: i, y: 1/8 * i * i });
+      }
 
     const data: Point2D[] = [];
     for (let i = 0; i < 15; i++) {
       data.push({ x: i, y: 1/8 * i * i });
     }
     lineChart(root, { start: 0, end: 10 }, { start: 0, end: 15 }, 32, size, data);
+      const points2: Point2D[] = [];
+      for (let i = 0; i < 15; i++) {
+        points2.push({ x: i, y: Math.sqrt(i) });
+      }
+
+      const points3: Point2D[] = [];
+      for (let i = -12; i < 13; i++) {
+        points3.push({ x: i, y: 4 * Math.sin(i) });
+      }
+
+      const indigoLine: Line = {
+        data: points1,
+        style: {
+          size: 3,
+        },
+        marker: {
+          size: 10,
+        }
+      };
+      const tealLine: Line = {
+        data: points2,
+        style: {
+          color: "var(--color-teal-600)",
+          size: 3
+        },
+        marker: {
+          shape: 'circle',
+          color: "var(--color-teal-300)",
+          size: 5,
+        }
+      };
+      const amberLine: Line = {
+        data: points3,
+        style: {
+          color: "var(--color-amber-600)",
+          size: 3
+        },
+        marker: {
+          shape: 'circle',
+          color: "var(--color-amber-400)",
+          size: 5,
+        },
+      };
+      lineChart(root, { start: -10, end: 10 }, { start: -15, end: 15 }, 32, size, [
+        indigoLine, tealLine, amberLine,
+      ], true);
+    };
+
+    drawExampleLineChart();
   }, [size]);
 
   return (
