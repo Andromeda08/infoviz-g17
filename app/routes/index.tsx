@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import { renderToString } from "react-dom/server";
 
-import { loadEmissions, type CountrySeries } from "~/lib/emissions";
+import { loadEmissions, sourceSharesForYear, type CountrySeries } from "~/lib/emissions";
 import { loadWorldBank, type WbSeries } from "~/lib/worldBank";
 import { useVisualizationSize } from "~/lib/useVisualizationSize";
 import { type Line, type Range, lineChart, type Point2D } from "~/lib/vis/lineChart";
@@ -355,45 +355,124 @@ export default function Index() {
     drawEmissionsComparisonChart(root);
   }, [size, emLoading, wbLoading, emissionsData, worldBankData, countryA, countryB, selectedYear]);
 
-  // TODO: (Example chart for the other location) Remove this and implement barchart
+  // bar chart
   useEffect(() => {
-    if (!barChartRef.current) {
-      return;
-    }
+    if (!barChartRef.current) return;
+    if (emLoading) return;
+    if (!barChartSize.width || !barChartSize.height) return;
+    if (selectedYear === null) return;
 
+    // clear
     d3.select(barChartRef.current).selectAll("*").remove();
 
-    const root = d3
+    const svg = d3
       .select(barChartRef.current)
       .append("svg")
       .attr("width", barChartSize.width)
       .attr("height", barChartSize.height);
 
-    const points: Point2D[] = [];
-    for (let i = -4; i < 5; i++) {
-      points.push({ x: i, y: 0.5 * Math.sin(i)});
+    // layout
+    const margin = { top: 28, right: 16, bottom: 28, left: 16 };
+    const W = barChartSize.width - margin.left - margin.right;
+    const H = barChartSize.height - margin.top - margin.bottom;
+
+    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // title (minimal)
+    g.append("text")
+      .attr("x", 0)
+      .attr("y", -10)
+      .attr("fill", "var(--color-zinc-200)")
+      .attr("font-size", 12)
+      .text(`Emission sources share (${selectedYear})`);
+
+    // helper: get shares for a country+year
+    const getShares = (iso3: string) => {
+      const c = emissionsData.find((d) => d.iso3 === iso3);
+      if (!c) return [];
+      // returns [{source, value, share}]
+      const shares = sourceSharesForYear(c.points, selectedYear);
+      // normalize defensively (in case rounding / missing)
+      const sum = shares.reduce((s, d) => s + d.share, 0);
+      if (sum <= 0) return [];
+      return shares.map((d) => ({ ...d, share: d.share / sum }));
+    };
+
+    const sharesA = getShares(countryA);
+    const sharesB = getShares(countryB);
+
+    // if no data, show message
+    if (sharesA.length === 0 && sharesB.length === 0) {
+      g.append("text")
+        .attr("x", 0)
+        .attr("y", 16)
+        .attr("fill", "var(--color-zinc-400)")
+        .attr("font-size", 12)
+        .text("No data for selected year.");
+      return;
     }
-    lineChart({
-      selection: root,
-      data: [{
-        data: points,
-        style: {
-          color: "var(--color-amber-600)",
-          size: 3,
-        },
-        marker: {
-          shape: 'circle',
-          color: "var(--color-amber-400)",
-          size: 4,
-        },
-      }],
-      size: barChartSize,
-      axes: true,
-      xr: { start: -4, end: 4 },
-      yr: { start: -2, end: 2 },
-      ticksY: 4,
-    })
-  }, [barChartSize]);
+
+    // color mapping (minimal + consistent)
+    const colorBySource: Record<string, string> = {
+      Coal: "var(--color-zinc-400)",
+      Oil: "var(--color-amber-400)",
+      Gas: "var(--color-sky-400)",
+      Cement: "var(--color-stone-300)",
+      Flaring: "var(--color-rose-400)",
+      Other: "var(--color-violet-400)",
+    };
+
+    // x positions for 2 bars
+    const x = d3
+      .scaleBand<string>()
+      .domain(["A", "B"])
+      .range([0, W])
+      .padding(0.4);
+
+    const barW = x.bandwidth();
+
+    // y scale is 0..1 (100% stacked)
+    const y = d3.scaleLinear().domain([0, 1]).range([H, 0]);
+
+    // draw one stacked bar
+    const drawStack = (key: "A" | "B", shares: { source: string; share: number }[]) => {
+      const x0 = x(key);
+      if (x0 === undefined) return;
+
+      let acc = 0; // bottom accumulator in [0..1]
+
+      for (const s of shares) {
+        const y0 = y(acc);
+        const y1 = y(acc + s.share);
+
+        g.append("rect")
+          .attr("x", x0)
+          .attr("y", y1)
+          .attr("width", barW)
+          .attr("height", Math.max(0, y0 - y1))
+          .attr("fill", colorBySource[s.source] ?? "var(--color-zinc-500)");
+
+        acc += s.share;
+      }
+
+      // label under bar
+      g.append("text")
+        .attr("x", x0 + barW / 2)
+        .attr("y", H + 18)
+        .attr("text-anchor", "middle")
+        .attr("fill", "var(--color-zinc-300)")
+        .attr("font-size", 11)
+        .text(key === "A" ? countryA : countryB);
+    };
+
+    drawStack("A", sharesA);
+    drawStack("B", sharesB);
+
+    // minimal outline for bars
+    g.selectAll("rect")
+      .attr("stroke", "var(--color-zinc-900)")
+      .attr("stroke-width", 1);
+  }, [barChartSize, emLoading, emissionsData, countryA, countryB, selectedYear]);
 
   return (
     <div className="h-screen w-screen p-8 flex flex-col gap-4 relative">
@@ -461,6 +540,31 @@ export default function Index() {
             ref={barChartRef}
             className="w-full z-0 resize min-h-0 flex-1 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"
           />
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+            <p className="text-xs text-zinc-400 mb-2">
+              Emission sources
+            </p>
+
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              {[
+                ["Coal", "#9ca3af"],
+                ["Cement", "#e5e7eb"],
+                ["Oil", "#facc15"],
+                ["Flaring", "#fb7185"],
+                ["Gas", "#38bdf8"],
+                ["Other", "#a78bfa"],
+              ].map(([label, color]) => (
+                <div key={label} className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-sm"
+                    style={{ background: color }}
+                  />
+                  <span className="text-zinc-300">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
