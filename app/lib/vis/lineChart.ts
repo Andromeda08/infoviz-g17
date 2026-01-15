@@ -30,6 +30,7 @@ type LineStyle = {
 
 export type Line = {
   data: Point2D[];
+  name?: string;
   style?: LineStyle;
   marker?: MarkerStyle;
 }
@@ -43,8 +44,6 @@ export const getRange = (data: LineChartData, axis: keyof Point2D): Range => {
     end: maxElement(points, (p) => p[axis])[axis],
   };
 }
-
-const lerp = (v: number, a: number, b: number): number => a + v * (b - a);
 
 type LineChartParams<T extends d3.BaseType> = {
   selection: d3.Selection<T, unknown, null, undefined>,
@@ -121,7 +120,9 @@ export const lineChart = <T extends d3.BaseType>(
       .style("color", "var(--color-zinc-50)")
       .style("border-radius", "8px")
       .style("pointer-events", "none")
-      .style("opacity", 0);
+      .style("opacity", 0)
+      .style("top", "0px")
+      .style("left", "0px");
   }
 
   // Line drawing utility fn

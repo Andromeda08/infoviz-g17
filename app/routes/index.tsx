@@ -8,6 +8,7 @@ import { loadWorldBank, type WbSeries } from "~/lib/worldBank";
 import { useVisualizationSize } from "~/lib/useVisualizationSize";
 import { type Line, type Range, lineChart, type Point2D } from "~/lib/vis/lineChart";
 import { maxElement, minElement } from "~/lib/math";
+import {line} from "d3";
 
 // Vite "work-around" for react fast refresh to re-render d3 useEffect on source changes.
 if (import.meta.hot) {
@@ -33,8 +34,11 @@ type TooltipData = {
 };
 
 export default function Index() {
-  const visRef = useRef<HTMLDivElement>(null);
-  const { size } = useVisualizationSize(visRef);
+  const lineChartRef = useRef<HTMLDivElement>(null);
+  const { size } = useVisualizationSize(lineChartRef);
+
+  const barChartRef = useRef<HTMLDivElement>(null);
+  const { size: barChartSize } = useVisualizationSize(barChartRef);
 
   // load emission data in state
   const [emLoading, setEmLoading] = useState(true);
@@ -83,22 +87,22 @@ export default function Index() {
     const MIN_YEAR = 1950;
 
     const pointsRaw = country.points.filter(
-  (p) => p.year >= MIN_YEAR && Number.isFinite(p.perCapita)
-);
+      (p) => p.year >= MIN_YEAR && Number.isFinite(p.perCapita)
+    );
 
     const points: Point2D[] = pointsRaw
-  .filter((d) => Number.isFinite(d.perCapita))
-  .map((d) => ({
-    x: d.year,
-    y: d.perCapita,
-    customData: {
-      iso3,
-      name: country.country,
-      year: d.year,
-      co2: d.total,
-      perCapita: d.perCapita,
-    },
-  }));
+      .filter((d) => Number.isFinite(d.perCapita))
+      .map((d) => ({
+        x: d.year,
+        y: d.perCapita,
+        customData: {
+          iso3,
+          name: country.country,
+          year: d.year,
+          co2: d.total,
+          perCapita: d.perCapita,
+        },
+      }));
 
     return {
       points,
@@ -122,6 +126,7 @@ export default function Index() {
 
     const lineA: Line = {
       data: countryAData.points,
+      name: countryA,
       style: {
         color: "var(--color-rose-500)",
         size: 3,
@@ -135,6 +140,7 @@ export default function Index() {
 
     const lineB: Line = {
       data: countryBData.points,
+      name: countryB,
       style: {
         color: "var(--color-indigo-500)",
         size: 3,
@@ -162,18 +168,18 @@ export default function Index() {
       data: [lineA, lineB],
       size: size,
       normalize: false,
-      margin: 64,
+      margin: 32,
       axes: true,
       xr,
       yr,
 
-      ticksX: 8,              
-      ticksY: 6,              
+      ticksX: 8,
+      ticksY: 6,
       formatX: d3.format("d"),
       formatY: d3.format("~s"),
 
       // tooltip with emission data and worldBank data
-      tooltipRef: visRef,
+      tooltipRef: lineChartRef,
       renderTooltip: (p: Point2D): string => {
         const cd = p.customData as TooltipData | undefined;
         if (!cd) return "";
@@ -231,15 +237,15 @@ export default function Index() {
 
   // draw if data is loaded
   useEffect(() => {
-    if (!visRef.current) return;
+    if (!lineChartRef.current) return;
     if (!size.width || !size.height) return;
     if (emLoading || wbLoading) return;
 
     // clear + build svg
-    d3.select(visRef.current).selectAll("*").remove();
+    d3.select(lineChartRef.current).selectAll("*").remove();
 
     const root = d3
-      .select(visRef.current)
+      .select(lineChartRef.current)
       .append("svg")
       .attr("width", size.width)
       .attr("height", size.height);
@@ -247,60 +253,105 @@ export default function Index() {
     drawEmissionsComparisonChart(root);
   }, [size, emLoading, wbLoading, emissionsData, worldBankData, countryA, countryB]);
 
+  // TODO: (Example chart for the other location) Remove this and implement barchart
+  useEffect(() => {
+    if (!barChartRef.current) {
+      return;
+    }
+
+    d3.select(barChartRef.current).selectAll("*").remove();
+
+    const root = d3
+      .select(barChartRef.current)
+      .append("svg")
+      .attr("width", barChartSize.width)
+      .attr("height", barChartSize.height);
+
+    const points: Point2D[] = [];
+    for (let i = -4; i < 5; i++) {
+      points.push({ x: i, y: 0.5 * Math.sin(i)});
+    }
+    lineChart({
+      selection: root,
+      data: [{
+        data: points,
+        style: {
+          color: "var(--color-amber-600)",
+          size: 3,
+        },
+        marker: {
+          shape: 'circle',
+          color: "var(--color-amber-400)",
+          size: 4,
+        },
+      }],
+      size: barChartSize,
+      axes: true,
+      xr: { start: -4, end: 4 },
+      yr: { start: -2, end: 2 },
+      ticksY: 4,
+    })
+  }, [barChartSize]);
+
   return (
-    <div className="p-16 h-screen flex flex-col gap-2 relative">
-      <p className="min-w-56 p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-        CO₂ line chart (MtCO₂ Per Capita) — size: [{size.width}, {size.height}]
+    <div className="h-dvh s-dvw p-8 flex flex-col gap-4 relative">
+      <p className="w-full p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+        CO₂ Consumption Comparison (MtCO₂ Per Capita)
       </p>
+      <div className="h-[85%] grid grid-cols-[256px_auto] gap-4">
+        <div className="w-64 h-full flex flex-col gap-4">
+          <div className="flex flex-col gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3 w-64">
+            <div className="text-xs text-zinc-400">
+              Select up to 2 countries (ISO3-based)
+            </div>
 
-      <div
-        ref={visRef}
-        className="z-0 relative w-full min-h-0 flex-1 border border-zinc-900"
-      />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-zinc-400">Country A</label>
+              <select
+                className="bg-zinc-950 border border-zinc-700 rounded-md p-2 text-sm"
+                value={countryA}
+                onChange={(e) => setCountryA(e.target.value)}
+                disabled={emLoading}
+              >
+                {emissionOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      {/* dropdown overlay */}
-      <div className="absolute top-20 right-16 z-20 flex flex-col gap-3 bg-zinc-900/90 border border-zinc-800 rounded-xl p-3 w-64">
-        <div className="text-xs text-zinc-400">
-          Select up to 2 countries (ISO3-based)
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-zinc-400">Country B</label>
+              <select
+                className="bg-zinc-950 border border-zinc-700 rounded-md p-2 text-sm"
+                value={countryB}
+                onChange={(e) => setCountryB(e.target.value)}
+                disabled={emLoading}
+              >
+                {emissionOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="text-xs text-zinc-500">
+              {emLoading || wbLoading
+                ? "Loading datasets…"
+                : `Emissions: ${emissionsData.length} | WB: ${worldBankData.length}`}
+            </div>
+          </div>
+          <div
+            ref={barChartRef}
+            className="w-full z-0 resize min-h-0 flex-1 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"
+          />
         </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-zinc-400">Country A</label>
-          <select
-            className="bg-zinc-950 border border-zinc-700 rounded-md p-2 text-sm"
-            value={countryA}
-            onChange={(e) => setCountryA(e.target.value)}
-            disabled={emLoading}
-          >
-            {emissionOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-zinc-400">Country B</label>
-          <select
-            className="bg-zinc-950 border border-zinc-700 rounded-md p-2 text-sm"
-            value={countryB}
-            onChange={(e) => setCountryB(e.target.value)}
-            disabled={emLoading}
-          >
-            {emissionOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="text-xs text-zinc-500">
-          {emLoading || wbLoading
-            ? "Loading datasets…"
-            : `Emissions: ${emissionsData.length} | WB: ${worldBankData.length}`}
-        </div>
+        <div
+          ref={lineChartRef}
+          className="z-0 relative w-full min-h-0 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"
+        />
       </div>
     </div>
   );
