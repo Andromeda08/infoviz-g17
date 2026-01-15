@@ -29,6 +29,7 @@ type TooltipData = {
   name: string;
   year: number;
   co2: number;
+  perCapita: number;
 };
 
 export default function Index() {
@@ -78,23 +79,26 @@ export default function Index() {
       return { points: [], range: { start: 0, end: 0 }, domain: { start: 0, end: 0 } };
     }
 
-    // capped at year 1050
+    // capped at year 1950
     const MIN_YEAR = 1950;
 
     const pointsRaw = country.points.filter(
-      (p) => p.year >= MIN_YEAR && Number.isFinite(p.total)
-    );
+  (p) => p.year >= MIN_YEAR && Number.isFinite(p.perCapita)
+);
 
-    const points: Point2D[] = pointsRaw.map((d) => ({
-      x: d.year,
-      y: d.total, 
-      customData: {
-        iso3,
-        name: country.country,
-        year: d.year,
-        co2: d.total,
-      } satisfies TooltipData,
-    }));
+    const points: Point2D[] = pointsRaw
+  .filter((d) => Number.isFinite(d.perCapita))
+  .map((d) => ({
+    x: d.year,
+    y: d.perCapita,
+    customData: {
+      iso3,
+      name: country.country,
+      year: d.year,
+      co2: d.total,
+      perCapita: d.perCapita,
+    },
+  }));
 
     return {
       points,
@@ -104,7 +108,7 @@ export default function Index() {
       },
       domain: {
         start: 0,
-        end: maxElement(pointsRaw, (p) => p.total).total,
+        end: maxElement(pointsRaw, (p) => p.perCapita).perCapita,
       },
     };
   };
@@ -188,7 +192,11 @@ export default function Index() {
               <span className="text-zinc-400">Year:</span> {cd.year}
             </p>
             <p>
-              <span className="text-zinc-400">CO₂ (Mt):</span> {fmtInt(cd.co2)}
+              <span className="text-zinc-400">CO₂ (total, Mt):</span> {fmtInt(cd.co2)}
+            </p>
+            <p>
+              <span className="text-zinc-400">CO₂ (per capita):</span>{" "}
+              {Number.isFinite(cd.perCapita) ? cd.perCapita.toFixed(2) : "n/a"}
             </p>
 
             {wb && (
@@ -242,7 +250,7 @@ export default function Index() {
   return (
     <div className="p-16 h-screen flex flex-col gap-2 relative">
       <p className="min-w-56 p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-        CO₂ line chart (Total MtCO₂) — size: [{size.width}, {size.height}]
+        CO₂ line chart (MtCO₂ Per Capita) — size: [{size.width}, {size.height}]
       </p>
 
       <div
