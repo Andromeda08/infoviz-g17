@@ -163,9 +163,10 @@ export default function Index() {
       end: Math.max(countryAData.domain.end || 0, countryBData.domain.end || 0),
     };
 
+    const lines = [lineA, lineB];
     lineChart({
       selection: root,
-      data: [lineA, lineB],
+      data: lines,
       size: size,
       normalize: false,
       margin: 32,
@@ -233,6 +234,32 @@ export default function Index() {
         );
       },
     });
+
+    // Add Legend
+    d3
+      .select(lineChartRef?.current)
+      .append("div")
+      .style("transition-property", "opacity")
+      .style("transition-timing-function", "var(--tw-ease, var(--default-transition-timing-function)")
+      .style("transition-duration", "var(--tw-duration, var(--default-transition-duration)")
+      .style("position", "absolute")
+      .style("padding", "12px")
+      .style("background", "var(--color-zinc-900)")
+      .style("color", "var(--color-zinc-50)")
+      .style("border-radius", "8px")
+      .style("pointer-events", "none")
+      .style("top", "16px")
+      .style("right", "16px")
+      .html(renderToString(
+        <div className="min-w-16 flex flex-col gap-2">
+          {lines.map((line) => (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2" style={{ background: line.style?.color ?? "var(--color-zinc-50)"}} />
+              <p className="text-xs text-zinc-300">{line.name ?? "Unknown"}</p>
+            </div>
+          ))}
+        </div>
+      ));
   };
 
   // draw if data is loaded
@@ -294,11 +321,15 @@ export default function Index() {
   }, [barChartSize]);
 
   return (
-    <div className="h-dvh s-dvw p-8 flex flex-col gap-4 relative">
+    <div className="h-screen w-screen p-8 flex flex-col gap-4 relative">
       <p className="w-full p-4 bg-zinc-900 rounded-xl border border-zinc-800">
         CO₂ Consumption Comparison (MtCO₂ Per Capita)
       </p>
-      <div className="h-[85%] grid grid-cols-[256px_auto] gap-4">
+      <div className="h-[85%] grid grid-cols-[auto_256px] gap-4">
+        <div
+          ref={lineChartRef}
+          className="z-0 relative w-full min-h-0 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"
+        />
         <div className="w-64 h-full flex flex-col gap-4">
           <div className="flex flex-col gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3 w-64">
             <div className="text-xs text-zinc-400">
@@ -348,10 +379,6 @@ export default function Index() {
             className="w-full z-0 resize min-h-0 flex-1 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"
           />
         </div>
-        <div
-          ref={lineChartRef}
-          className="z-0 relative w-full min-h-0 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"
-        />
       </div>
     </div>
   );
