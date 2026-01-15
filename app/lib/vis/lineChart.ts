@@ -1,5 +1,7 @@
 import * as d3 from 'd3';
 import type { Size2D } from "~/lib/useVisualizationSize";
+import { maxElement, minElement } from "~/lib/math";
+import type {RefObject} from "react";
 
 export type Range = {
   start: number;
@@ -9,6 +11,8 @@ export type Range = {
 export type Point2D = {
   x: number;
   y: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  customData?: any;
 };
 
 type MarkerShape = "square" | "circle";
@@ -32,25 +36,91 @@ export type Line = {
 
 export type LineChartData = Line[];
 
-export const lineChart = <T extends d3.BaseType>(
+export const getRange = (data: LineChartData, axis: keyof Point2D): Range => {
+  const points = data.flatMap((d) => d.data);
+  return {
+    start: minElement(points, (p) => p[axis])[axis],
+    end: maxElement(points, (p) => p[axis])[axis],
+  };
+}
+
+const lerp = (v: number, a: number, b: number): number => a + v * (b - a);
+
+type LineChartParams<T extends d3.BaseType> = {
   selection: d3.Selection<T, unknown, null, undefined>,
-  x: Range,
-  y: Range,
-  margin: number,
-  size: Size2D,
   data: LineChartData,
-  axes: boolean = false,
+  size: Size2D,
+  xr?: Range,
+  yr?: Range,
+  normalize?: boolean,
+  margin?: number,
+  axes?: boolean,
+  tooltipRef?: RefObject<HTMLDivElement | null>;
+  renderTooltip?: (point: Point2D) => string;
+}
+
+export const lineChart = <T extends d3.BaseType>(
+  params: LineChartParams<T>
 ) => {
+  const { selection, data, size, tooltipRef, renderTooltip } = params;
+
+  const margin:    number  = params.margin ?? 32;
+  const normalize: boolean = params.normalize ?? false;
+  const axes:      boolean = params.axes ?? false;
+
+  const rangeX = params.xr ?? getRange(data, 'x');
+  const rangeY = params.yr ?? getRange(data, 'y');
+
+  const x: Range = normalize ? { start: 0, end: 1 } : rangeX;
+  const y: Range = normalize ? { start: 0, end: 1 } : rangeY;
+
+  const lines = data.map((line) => {
+    return {
+      ...line,
+      data: line.data.map((point) => {
+        if (normalize) {
+          return {
+            x: (point.x - rangeX.start) / (rangeX.end - rangeX.start),
+            y: (point.y - rangeY.start) / (rangeY.end - rangeY.start),
+            customData: point.customData,
+          };
+        }
+        return point;
+      }),
+    }
+  })
+
+  // point -> chart X
   const dx = (size.width - 2 * margin) / (x.end - x.start);
   const getX = (point: Point2D) => {
     return margin + ((point.x + (-1 * x.start)) * dx);
   };
 
+  // point -> chart Y
   const dy = (size.height - 2 * margin) / (y.end - y.start);
   const getY = (point: Point2D): number => {
     return size.height - margin - ((point.y + (-1 * y.start)) * dy);
   };
 
+  // Tooltip setup
+  let tooltip: d3.Selection<HTMLDivElement, unknown, null, undefined> | null = null;
+  if (tooltipRef) {
+    tooltip = d3
+      .select(tooltipRef?.current)
+      .append("div")
+      .style("transition-property", "opacity")
+      .style("transition-timing-function", "var(--tw-ease, var(--default-transition-timing-function)")
+      .style("transition-duration", "var(--tw-duration, var(--default-transition-duration)")
+      .style("position", "absolute")
+      .style("padding", "12px")
+      .style("background", "var(--color-zinc-800)")
+      .style("color", "var(--color-zinc-50)")
+      .style("border-radius", "8px")
+      .style("pointer-events", "none")
+      .style("opacity", 0);
+  }
+
+  // Line drawing utility fn
   const drawLine = (line: Line): void => {
     const sorted = line.data.sort((a, b) => a.x - b.x);
 
@@ -73,9 +143,11 @@ export const lineChart = <T extends d3.BaseType>(
     const shape = line.marker?.shape ?? 'square';
 
     sorted.forEach((point: Point2D): void => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let marker: any = undefined;
       switch (shape) {
-        case "square":
-          selection
+        case "square": {
+          marker = selection
             .append("rect")
             .attr("x", getX(point) - (a / 2))
             .attr("y", getY(point) - (a / 2))
@@ -83,14 +155,33 @@ export const lineChart = <T extends d3.BaseType>(
             .attr("height", a)
             .attr("fill", line.marker?.color ?? "var(--color-indigo-400)");
           break;
-        case "circle":
-          selection
+        }
+        case "circle": {
+          marker = selection
             .append("circle")
             .attr("cx", getX(point))
             .attr("cy", getY(point))
             .attr("r", a)
             .attr("fill", line.marker?.color ?? "var(--color-indigo-400)");
           break;
+        }
+      }
+      if (marker && tooltip && renderTooltip) {
+        marker
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .on("mouseover", (event: any) => {
+            d3.select(event.currentTarget).attr("fill", "var(--color-zinc-100)");
+            tooltip
+              .style("opacity", 1)
+              .style("left", `${8 + getX(point) - (a / 2)}px`)
+              .style("top", `${8 + getY(point) - (a / 2)}px`)
+              .html(renderTooltip(point));
+          })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .on("mouseleave", (event: any) => {
+            d3.select(event.currentTarget).attr("fill", line.marker?.color ?? "var(--color-indigo-400)");
+            tooltip.style("opacity", 0);
+          });
       }
     });
   };
@@ -117,7 +208,7 @@ export const lineChart = <T extends d3.BaseType>(
   }
 
   // Draw each line
-  data.forEach((line: Line): void => drawLine(line));
+  lines.forEach((line: Line): void => drawLine(line));
 
   // Draw axes over lines
   const scaleX = d3
@@ -126,7 +217,11 @@ export const lineChart = <T extends d3.BaseType>(
     .range([margin, size.width - margin]);
   const axisX = d3
     .axisBottom(scaleX)
-    .ticks(x.end - x.start);
+    .ticks(normalize ? 20 : x.end - x.start)
+    .tickFormat((value, _index) => normalize
+      ? `${Math.floor(lerp(value.valueOf(), rangeX.start, rangeX.end)).toLocaleString()}`
+      : `${value}`
+    );
 
   selection
     .append('g')
@@ -139,7 +234,11 @@ export const lineChart = <T extends d3.BaseType>(
     .range([margin, size.height - margin]);
   const axisY = d3
     .axisLeft(scaleY)
-    .ticks(y.end - y.start);
+    .ticks(normalize ? 20 : y.end - y.start)
+    .tickFormat((value, _index) => normalize
+      ? `${Math.floor(lerp(value.valueOf(), rangeY.start, rangeY.end)).toLocaleString()}`
+      : `${value}`
+    );
 
   selection
     .append('g')
