@@ -55,6 +55,10 @@ type LineChartParams<T extends d3.BaseType> = {
   normalize?: boolean,
   margin?: number,
   axes?: boolean,
+  ticksX?: number;
+  ticksY?: number;
+  formatX?: (value: d3.NumberValue) => string;
+  formatY?: (value: d3.NumberValue) => string;
   tooltipRef?: RefObject<HTMLDivElement | null>;
   renderTooltip?: (point: Point2D) => string;
 }
@@ -212,36 +216,33 @@ export const lineChart = <T extends d3.BaseType>(
 
   // Draw axes over lines
   const scaleX = d3
-    .scaleLinear()
-    .domain([x.start, x.end])
-    .range([margin, size.width - margin]);
+  .scaleLinear()
+  .domain([x.start, x.end])
+  .range([margin, size.width - margin]);
+
   const axisX = d3
-    .axisBottom(scaleX)
-    .ticks(normalize ? 20 : x.end - x.start)
-    .tickFormat((value, _index) => normalize
-      ? `${Math.floor(lerp(value.valueOf(), rangeX.start, rangeX.end)).toLocaleString()}`
-      : `${value}`
-    );
+  .axisBottom(scaleX)
+  .ticks(params.ticksX ?? (normalize ? 10 : 8))
+  .tickFormat((params.formatX ?? (d3.format("d") as any)) as any);
 
   selection
-    .append('g')
-    .attr("transform", `translate(0, ${size.height - margin})`)
-    .call(axisX);
+  .append("g")
+  .attr("transform", `translate(0, ${size.height - margin})`)
+  .call(axisX);
 
   const scaleY = d3
-    .scaleLinear()
-    .domain([y.end, y.start])
-    .range([margin, size.height - margin]);
+  .scaleLinear()
+  // y-axis should go from high to low (top -> bottom)
+  .domain([y.end, y.start])
+  .range([margin, size.height - margin]);
+
   const axisY = d3
-    .axisLeft(scaleY)
-    .ticks(normalize ? 20 : y.end - y.start)
-    .tickFormat((value, _index) => normalize
-      ? `${Math.floor(lerp(value.valueOf(), rangeY.start, rangeY.end)).toLocaleString()}`
-      : `${value}`
-    );
+  .axisLeft(scaleY)
+  .ticks(params.ticksY ?? 6)
+  .tickFormat((params.formatY ?? (d3.format("~s") as any)) as any);
 
   selection
-    .append('g')
-    .attr("transform", `translate(${margin}, 0)`)
-    .call(axisY);
+  .append("g")
+  .attr("transform", `translate(${margin}, 0)`)
+  .call(axisY);
 };
