@@ -31,6 +31,7 @@ type TooltipData = {
   year: number;
   co2: number;
   perCapita: number;
+  selected?: boolean;
 };
 
 export default function Index() {
@@ -64,6 +65,54 @@ export default function Index() {
   const [countryA, setCountryA] = useState<string>("DEU");
   const [countryB, setCountryB] = useState<string>("FRA");
 
+  // shared selected year
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+
+  // prepick 2021 if available
+  useEffect(() => {
+    // only set once
+    if (selectedYear !== null) return;
+
+    // wait until emissions are loaded
+    if (emLoading) return;
+    if (emissionsData.length === 0) return;
+
+    const a = emissionsData.find((d) => d.iso3 === countryA);
+    const b = emissionsData.find((d) => d.iso3 === countryB);
+
+    const yearsA = a?.points.map((p) => p.year) ?? [];
+    const yearsB = b?.points.map((p) => p.year) ?? [];
+
+    const yearSetA = new Set(yearsA);
+    const yearSetB = new Set(yearsB);
+
+    // prefer 2021 if both have it
+    const preferred = 2021;
+    const bothHave2021 = yearSetA.has(preferred) && yearSetB.has(preferred);
+
+    if (bothHave2021) {
+      setSelectedYear(preferred);
+      return;
+    }
+
+    // otherwise pick latest year that exists in BOTH series
+    const commonYears = yearsA.filter((y) => yearSetB.has(y));
+    if (commonYears.length > 0) {
+      setSelectedYear(Math.max(...commonYears));
+      return;
+    }
+
+    // last fallback: latest of countryA, otherwise latest of countryB
+    if (yearsA.length > 0) {
+      setSelectedYear(Math.max(...yearsA));
+      return;
+    }
+    if (yearsB.length > 0) {
+      setSelectedYear(Math.max(...yearsB));
+      return;
+    }
+  }, [selectedYear, emLoading, emissionsData, countryA, countryB]);
+
   // dropdown options
   const emissionOptions = useMemo(() => {
     return emissionsData.map((c) => ({ label: c.country, value: c.iso3 }));
@@ -76,8 +125,19 @@ export default function Index() {
     return wbSeries.points.find((p) => p.year === year) ?? null;
   }
 
+  // console output when a year is selected
+  useEffect(() => {
+    if (selectedYear === null) return;
+    const a = emissionsData.find((d) => d.iso3 === countryA);
+    const b = emissionsData.find((d) => d.iso3 === countryB);
+
+    console.log("Clicked year:", selectedYear);
+    console.log("Country A:", a?.country ?? countryA, `(${countryA})`);
+    console.log("Country B:", b?.country ?? countryB, `(${countryB})`);
+  }, [selectedYear, countryA, countryB, emissionsData]);
+
   // emissiondata
-  const processEmissionsCountry = (iso3: string): CountryData => {
+  const processEmissionsCountry = (iso3: string, selectedYear: number | null): CountryData => {
     const country = emissionsData.find((d) => d.iso3 === iso3);
     if (!country) {
       return { points: [], range: { start: 0, end: 0 }, domain: { start: 0, end: 0 } };
@@ -86,23 +146,24 @@ export default function Index() {
     // capped at year 1950
     const MIN_YEAR = 1950;
 
+    // filter for perCapita for barchart
     const pointsRaw = country.points.filter(
       (p) => p.year >= MIN_YEAR && Number.isFinite(p.perCapita)
     );
 
-    const points: Point2D[] = pointsRaw
-      .filter((d) => Number.isFinite(d.perCapita))
-      .map((d) => ({
-        x: d.year,
-        y: d.perCapita,
-        customData: {
-          iso3,
-          name: country.country,
-          year: d.year,
-          co2: d.total,
-          perCapita: d.perCapita,
-        },
-      }));
+    // points
+    const points: Point2D[] = pointsRaw.map((d) => ({
+      x: d.year,
+      y: d.perCapita,
+      customData: {
+        iso3,
+        name: country.country,
+        year: d.year,
+        co2: d.total,
+        perCapita: d.perCapita,
+        selected: selectedYear !== null && d.year === selectedYear,
+      } satisfies TooltipData,
+    }));
 
     return {
       points,
@@ -119,8 +180,8 @@ export default function Index() {
 
   // draw chart
   const drawEmissionsComparisonChart = (root: d3.Selection<SVGSVGElement, unknown, null, undefined>) => {
-    const countryAData = processEmissionsCountry(countryA);
-    const countryBData = processEmissionsCountry(countryB);
+    const countryAData = processEmissionsCountry(countryA, selectedYear);
+    const countryBData = processEmissionsCountry(countryB, selectedYear);
 
     if (countryAData.points.length === 0 && countryBData.points.length === 0) return;
 
@@ -173,11 +234,16 @@ export default function Index() {
       axes: true,
       xr,
       yr,
-
       ticksX: 8,
       ticksY: 6,
       formatX: d3.format("d"),
       formatY: d3.format("~s"),
+      // click handler
+      onPointClick: (pt: Point2D) => {
+        const cd = pt.customData as TooltipData | undefined;
+        if (!cd) return;
+        setSelectedYear(cd.year);
+      },
 
       // tooltip with emission data and worldBank data
       tooltipRef: lineChartRef,
@@ -230,18 +296,22 @@ export default function Index() {
                 No WB match for this country name.
               </div>
             )}
+
+            <div className="mt-2 pt-2 border-t border-zinc-800 text-zinc-500">
+              Click a point to select a year.
+            </div>
           </div>
         );
       },
     });
 
+    // legend should redraw first
+    d3.select(lineChartRef.current).selectAll(".chart-legend").remove();
+
     // Add Legend
-    d3
-      .select(lineChartRef?.current)
+    d3.select(lineChartRef?.current)
       .append("div")
-      .style("transition-property", "opacity")
-      .style("transition-timing-function", "var(--tw-ease, var(--default-transition-timing-function)")
-      .style("transition-duration", "var(--tw-duration, var(--default-transition-duration)")
+      .attr("class", "chart-legend")
       .style("position", "absolute")
       .style("padding", "12px")
       .style("background", "var(--color-zinc-900)")
@@ -250,16 +320,21 @@ export default function Index() {
       .style("pointer-events", "none")
       .style("top", "16px")
       .style("right", "16px")
-      .html(renderToString(
-        <div className="min-w-16 flex flex-col gap-2">
-          {lines.map((line) => (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2" style={{ background: line.style?.color ?? "var(--color-zinc-50)"}} />
-              <p className="text-xs text-zinc-300">{line.name ?? "Unknown"}</p>
-            </div>
-          ))}
-        </div>
-      ));
+      .html(
+        renderToString(
+          <div className="min-w-16 flex flex-col gap-2">
+            {lines.map((ln) => (
+              <div key={ln.name} className="flex items-center gap-2">
+                <div
+                  className="w-2 h-2"
+                  style={{ background: ln.style?.color ?? "var(--color-zinc-50)" }}
+                />
+                <p className="text-xs text-zinc-300">{ln.name ?? "Unknown"}</p>
+              </div>
+            ))}
+          </div>
+        )
+      );
   };
 
   // draw if data is loaded
@@ -278,7 +353,7 @@ export default function Index() {
       .attr("height", size.height);
 
     drawEmissionsComparisonChart(root);
-  }, [size, emLoading, wbLoading, emissionsData, worldBankData, countryA, countryB]);
+  }, [size, emLoading, wbLoading, emissionsData, worldBankData, countryA, countryB, selectedYear]);
 
   // TODO: (Example chart for the other location) Remove this and implement barchart
   useEffect(() => {
@@ -325,11 +400,13 @@ export default function Index() {
       <p className="w-full p-4 bg-zinc-900 rounded-xl border border-zinc-800">
         CO₂ Consumption Comparison (MtCO₂ Per Capita)
       </p>
+
       <div className="h-[85%] grid grid-cols-[auto_256px] gap-4">
         <div
           ref={lineChartRef}
           className="z-0 relative w-full min-h-0 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"
         />
+
         <div className="w-64 h-full flex flex-col gap-4">
           <div className="flex flex-col gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3 w-64">
             <div className="text-xs text-zinc-400">
@@ -373,7 +450,13 @@ export default function Index() {
                 ? "Loading datasets…"
                 : `Emissions: ${emissionsData.length} | WB: ${worldBankData.length}`}
             </div>
+
+            <div className="text-xs text-zinc-400">
+              Selected year:{" "}
+              <span className="text-zinc-200">{selectedYear ?? "none"}</span>
+            </div>
           </div>
+
           <div
             ref={barChartRef}
             className="w-full z-0 resize min-h-0 flex-1 rounded-xl border border-zinc-900 hover:border-zinc-800 transition-all"

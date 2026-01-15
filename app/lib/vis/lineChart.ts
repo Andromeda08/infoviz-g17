@@ -58,6 +58,7 @@ type LineChartParams<T extends d3.BaseType> = {
   ticksY?: number;
   formatX?: (value: d3.NumberValue) => string;
   formatY?: (value: d3.NumberValue) => string;
+  onPointClick?: (point: Point2D) => void;
   tooltipRef?: RefObject<HTMLDivElement | null>;
   renderTooltip?: (point: Point2D) => string;
 }
@@ -65,7 +66,7 @@ type LineChartParams<T extends d3.BaseType> = {
 export const lineChart = <T extends d3.BaseType>(
   params: LineChartParams<T>
 ) => {
-  const { selection, data, size, tooltipRef, renderTooltip } = params;
+  const { selection, data, size, tooltipRef, renderTooltip, onPointClick } = params;
 
   const margin:    number  = params.margin ?? 32;
   const normalize: boolean = params.normalize ?? false;
@@ -144,21 +145,30 @@ export const lineChart = <T extends d3.BaseType>(
     }
 
     // Data point markers
-    const a= line.marker?.size ?? 8;
+    const baseSize = line.marker?.size ?? 8;
     const shape = line.marker?.shape ?? 'square';
 
     sorted.forEach((point: Point2D): void => {
+
+      const isSelected = Boolean(point.customData?.selected);
+      const a = isSelected ? baseSize * 1.6 : baseSize;
+      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let marker: any = undefined;
       switch (shape) {
         case "square": {
           marker = selection
             .append("rect")
-            .attr("x", getX(point) - (a / 2))
-            .attr("y", getY(point) - (a / 2))
+            .attr("x", getX(point) - a / 2)
+            .attr("y", getY(point) - a / 2)
             .attr("width", a)
             .attr("height", a)
-            .attr("fill", line.marker?.color ?? "var(--color-indigo-400)");
+            .attr("fill", line.marker?.color ?? "var(--color-indigo-400)")
+            // when point selected
+            .attr("stroke", isSelected ? "var(--color-zinc-100)" : "none")
+            .attr("stroke-width", isSelected ? 2 : 0)
+            // clickable cursor
+            .style("cursor", onPointClick ? "pointer" : "default");
           break;
         }
         case "circle": {
@@ -167,10 +177,22 @@ export const lineChart = <T extends d3.BaseType>(
             .attr("cx", getX(point))
             .attr("cy", getY(point))
             .attr("r", a)
-            .attr("fill", line.marker?.color ?? "var(--color-indigo-400)");
+            .attr("fill", line.marker?.color ?? "var(--color-indigo-400)")
+            // when selected
+            .attr("stroke", isSelected ? "var(--color-zinc-100)" : "none")
+            .attr("stroke-width", isSelected ? 2 : 0)
+            // clickable cursor
+            .style("cursor", onPointClick ? "pointer" : "default");
           break;
         }
       }
+      
+      // click handler
+      if (marker && onPointClick) {
+        marker.on("click", () => onPointClick(point));
+      }
+
+      // tooltip events
       if (marker && tooltip && renderTooltip) {
         marker
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
