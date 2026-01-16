@@ -476,9 +476,17 @@ export default function Index() {
 
   return (
     <div className="h-screen w-screen p-8 flex flex-col gap-4 relative">
-      <p className="w-full p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-        CO₂ Consumption Comparison (MtCO₂ Per Capita)
-      </p>
+      <div className="flex items-center gap-4 ">
+        <p className="w-full p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+          CO₂ Consumption Comparison (MtCO₂ Per Capita)
+        </p>
+        <a
+          href="/map"
+          className="min-w-fit h-full flex items-center px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-zinc-300 transition-colors"
+        >
+          ← Back to World Map
+        </a>
+      </div>
 
       <div className="h-[85%] grid grid-cols-[auto_256px] gap-4">
         <div

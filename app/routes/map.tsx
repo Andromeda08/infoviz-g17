@@ -189,13 +189,13 @@ export default function MapPage() {
 
   return (
     <div className="h-screen w-screen p-8 flex flex-col gap-4 relative">
-      <div className="flex items-center justify-between">
-        <p className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+      <div className="flex items-center gap-4">
+        <p className="w-full p-4 bg-zinc-900 rounded-xl border border-zinc-800">
           Global CO₂ Emissions Map ({selectedYear})
         </p>
         <a
           href="/"
-          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+          className="min-w-fit h-full flex items-center px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-zinc-300 transition-colors"
         >
           ← Back to Charts
         </a>
