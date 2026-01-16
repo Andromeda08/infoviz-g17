@@ -24,17 +24,23 @@ export function meta(_args: Route.MetaArgs) {
 }
 
 const EMISSION_TYPES: { value: EmissionType; label: string }[] = [
-  { value: "total", label: "Total" },
-  { value: "coal", label: "Coal" },
-  { value: "oil", label: "Oil" },
-  { value: "gas", label: "Gas" },
+  { value: "perCapita", label: "Per Capita (t/person)" },
+  { value: "total", label: "Total (Mt)" },
+  { value: "coal", label: "Coal (Mt)" },
+  { value: "oil", label: "Oil (Mt)" },
+  { value: "gas", label: "Gas (Mt)" },
 ];
 
 function getEmissionValue(point: YearPoint, type: EmissionType): number {
   switch (type) {
-    case "coal": return point.coal;
-    case "oil": return point.oil;
-    case "gas": return point.gas;
+    case "perCapita":
+      return point.perCapita;
+    case "coal":
+      return point.coal;
+    case "oil":
+      return point.oil;
+    case "gas":
+      return point.gas;
     case "total":
     default:
       return point.total;
@@ -52,7 +58,7 @@ export default function MapPage() {
 
   // Controls
   const [selectedYear, setSelectedYear] = useState(2021);
-  const [emissionType, setEmissionType] = useState<EmissionType>("total");
+  const [emissionType, setEmissionType] = useState<EmissionType>("perCapita");
 
   // Load data
   useEffect(() => {
@@ -165,7 +171,9 @@ export default function MapPage() {
               <span className="text-zinc-400">
                 {emissionType.charAt(0).toUpperCase() + emissionType.slice(1)} CO₂:
               </span>{" "}
-              {fmtNum(emission.value)} Mt
+              {emissionType === "perCapita"
+                ? `${emission.value.toFixed(2)} t/person`
+                : `${fmtNum(emission.value)} Mt`}
             </p>
           </div>
         );
@@ -176,8 +184,9 @@ export default function MapPage() {
     const legendGroup = root
       .append("g")
       .attr("transform", `translate(0, ${mapHeight + 10})`);
-
-    renderColorLegend(legendGroup, colorScale, maxValue, size.width, 16, minValue);
+    
+    const legendUnit = emissionType === "perCapita" ? "t/cap" : "Mt";
+    renderColorLegend(legendGroup, colorScale, maxValue, size.width, 16, minValue, legendUnit);
   }, [size, emLoading, topology, emissionDataMap, selectedYear, emissionType]);
 
   // Format number for stats display

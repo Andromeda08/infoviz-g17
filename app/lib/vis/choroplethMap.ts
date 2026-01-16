@@ -4,7 +4,7 @@ import type { Topology, GeometryCollection } from "topojson-specification";
 import type { RefObject } from "react";
 import type { Size2D } from "~/lib/useVisualizationSize";
 
-export type EmissionType = "total" | "coal" | "oil" | "gas";
+export type EmissionType = "total" | "perCapita" | "coal" | "oil" | "gas";
 
 export type CountryEmission = {
   iso3: string;
@@ -241,7 +241,8 @@ export const renderColorLegend = <T extends d3.BaseType>(
   maxValue: number,
   width: number,
   height: number = 20,
-  _minValue: number = 0 // Always 0
+  _minValue: number = 0, // Always 0
+  unit: string = "t/cap"
 ) => {
   const legendWidth = width - 80;
   const legendHeight = height;
@@ -314,5 +315,5 @@ export const renderColorLegend = <T extends d3.BaseType>(
     .attr("text-anchor", "start")
     .attr("fill", "var(--color-zinc-500)")
     .attr("font-size", "10px")
-    .text("Mt");
+    .text(unit);
 };
